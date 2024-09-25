@@ -123,7 +123,8 @@ def convert_single_pdf(
     indent_blocks(pages)
 
     # Fix table blocks
-    table_count = format_tables(pages)
+    table_count, table_md_list,table_coordinate = format_tables(pages)
+
     out_meta["block_stats"]["table"] = table_count
 
     for page in pages:
@@ -170,4 +171,4 @@ def convert_single_pdf(
     out_meta["postprocess_stats"] = {"edit": edit_stats}
     doc_images = images_to_dict(pages)
 
-    return full_text, doc_images, out_meta
+    return full_text, doc_images, out_meta, table_md_list, table_coordinate

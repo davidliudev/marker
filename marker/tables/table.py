@@ -138,6 +138,9 @@ def merge_tables(page_table_boxes):
 def format_tables(pages: List[Page]):
     # Formats tables nicely into github flavored markdown
     table_count = 0
+    table_markdown_list = []
+    table_coordinates=[]
+
     for page in pages:
         table_insert_points = {}
         blocks_to_remove = set()
@@ -154,6 +157,7 @@ def format_tables(pages: List[Page]):
                     if table_idx not in table_insert_points:
                         table_insert_points[table_idx] = max(0, block_idx - len(blocks_to_remove)) # Where to insert the new table
                     blocks_to_remove.add(block_idx)
+            table_coordinates.append({"page":page.pnum,"bbox": table_box})
 
         new_page_blocks = []
         for block_idx, block in enumerate(page.blocks):
@@ -174,9 +178,12 @@ def format_tables(pages: List[Page]):
                 continue
 
             table_text = tabulate(table_rows, headers="firstrow", tablefmt="github", disable_numparse=True)
+            table_title = f"<<<Table {table_count}>>>\n"
+            table_markdown_list.append(table_text)
             table_block = Block(
                 bbox=table_box,
-                block_type="Table",
+                # block_type="Table",
+                block_type="Text",
                 pnum=pnum,
                 lines=[Line(
                     bbox=table_box,
@@ -187,13 +194,15 @@ def format_tables(pages: List[Page]):
                         font_size=0,
                         font_weight=0,
                         block_type="Table",
-                        text=table_text
+                        text=table_title
+                        # text=table_text
                     )]
                 )]
             )
+
             insert_point = table_insert_points[table_idx]
             insert_point = min(insert_point, len(new_page_blocks))
             new_page_blocks.insert(insert_point, table_block)
             table_count += 1
         page.blocks = new_page_blocks
-    return table_count
+    return table_count, table_markdown_list, table_coordinates
