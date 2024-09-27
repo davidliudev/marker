@@ -42,7 +42,8 @@ def convert_single_pdf(
         metadata: Optional[Dict] = None,
         langs: Optional[List[str]] = None,
         batch_multiplier: int = 1,
-        ocr_all_pages: bool = False
+        ocr_all_pages: bool = False,
+        replace_tables: bool = False,
 ) -> Tuple[str, Dict[str, Image.Image], Dict]:
     ocr_all_pages = ocr_all_pages or settings.OCR_ALL_PAGES
 
@@ -123,7 +124,7 @@ def convert_single_pdf(
     indent_blocks(pages)
 
     # Fix table blocks
-    table_count, table_md_list,table_coordinate = format_tables(pages)
+    table_count, table_md_list,table_coordinate = format_tables(pages, replace_tables=replace_tables)
 
     out_meta["block_stats"]["table"] = table_count
 

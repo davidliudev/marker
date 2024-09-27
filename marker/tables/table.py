@@ -135,7 +135,7 @@ def merge_tables(page_table_boxes):
     return [b for i, b in enumerate(page_table_boxes) if i not in ignore_boxes]
 
 
-def format_tables(pages: List[Page]):
+def format_tables(pages: List[Page],  replace_tables: bool = False):
     # Formats tables nicely into github flavored markdown
     table_count = 0
     table_markdown_list = []
@@ -182,8 +182,7 @@ def format_tables(pages: List[Page]):
             table_markdown_list.append(table_text)
             table_block = Block(
                 bbox=table_box,
-                # block_type="Table",
-                block_type="Text",
+                block_type="Text" if replace_tables else "Table",
                 pnum=pnum,
                 lines=[Line(
                     bbox=table_box,
@@ -194,8 +193,7 @@ def format_tables(pages: List[Page]):
                         font_size=0,
                         font_weight=0,
                         block_type="Table",
-                        text=table_title
-                        # text=table_text
+                        text=table_title if replace_tables else table_text
                     )]
                 )]
             )
