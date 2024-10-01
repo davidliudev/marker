@@ -45,13 +45,13 @@ def main():
     if args.extract_tables:
         for idx, table_md in enumerate(table_md_list):
             table_fname = f"{fname}_table_{idx}.md"
-            with open(os.path.join(args.output, table_fname), "w") as f:
+            with open(os.path.join(subfolder_path, table_fname), "w") as f:
                 f.write(table_md)
 
         # Save the table coordinates
         for idx, table_text in enumerate(table_coorinates):
             table_fname = f"{fname}_table_{idx}.json"
-            with open(os.path.join(args.output, table_fname), "w") as f:
+            with open(os.path.join(subfolder_path, table_fname), "w") as f:
                 jsonStr = json.dumps(table_text, indent=4)
                 f.write(jsonStr)
 
