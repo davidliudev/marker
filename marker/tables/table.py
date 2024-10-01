@@ -178,7 +178,7 @@ def format_tables(pages: List[Page],  replace_tables: bool = False):
                 continue
 
             table_text = tabulate(table_rows, headers="firstrow", tablefmt="github", disable_numparse=True)
-            table_title = f"<<<Table {table_count}>>>\n"
+            table_title = f"<<<Table {table_idx}>>>\n"
             table_markdown_list.append(table_text)
             table_block = Block(
                 bbox=table_box,
