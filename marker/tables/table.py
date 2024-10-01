@@ -142,6 +142,7 @@ def format_tables(pages: List[Page],  replace_tables: bool = False):
     table_coordinates=[]
 
     for page in pages:
+        page_tables = []
         table_insert_points = {}
         blocks_to_remove = set()
         pnum = page.pnum
@@ -178,8 +179,7 @@ def format_tables(pages: List[Page],  replace_tables: bool = False):
                 continue
 
             table_text = tabulate(table_rows, headers="firstrow", tablefmt="github", disable_numparse=True)
-            table_title = f"<<<Table {table_idx}>>>\n"
-            table_markdown_list.append(table_text)
+            table_title = f"<<<Table {table_count}>>>\n"
             table_block = Block(
                 bbox=table_box,
                 block_type="Text" if replace_tables else "Table",
@@ -201,6 +201,12 @@ def format_tables(pages: List[Page],  replace_tables: bool = False):
             insert_point = table_insert_points[table_idx]
             insert_point = min(insert_point, len(new_page_blocks))
             new_page_blocks.insert(insert_point, table_block)
+            page_tables.append({"insert_point": insert_point,"table_text": table_text})
             table_count += 1
+
+        # Sort the tables by insert point key
+        page_tables = sorted(page_tables, key=lambda x: x['insert_point'])
+        table_markdown_list.extend([table["table_text"] for table in page_tables])
+
         page.blocks = new_page_blocks
     return table_count, table_markdown_list, table_coordinates
