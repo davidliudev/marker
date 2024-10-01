@@ -42,6 +42,7 @@ def main():
     subfolder_path = save_markdown(args.output, fname, full_text, images, out_meta)
 
     table_subfolder_path = os.path.join(subfolder_path, "tables")
+    os.makedirs(table_subfolder_path, exist_ok=True)
 
     # Save the tables if requested
     if args.extract_tables:
