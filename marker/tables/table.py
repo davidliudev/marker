@@ -151,12 +151,14 @@ def format_tables(pages: List[Page],  replace_tables: bool = False):
         page_table_boxes = [rescale_bbox(page.layout.image_bbox, page.bbox, b.bbox) for b in page_table_boxes]
         page_table_boxes = merge_tables(page_table_boxes)
 
+        offsetBlock = 0
         for table_idx, table_box in enumerate(page_table_boxes):
             for block_idx, block in enumerate(page.blocks):
                 intersect_pct = block.intersection_pct(table_box)
                 if intersect_pct > settings.TABLE_INTERSECTION_THRESH and block.block_type == "Table":
                     if table_idx not in table_insert_points:
-                        table_insert_points[table_idx] = max(0, block_idx - len(blocks_to_remove)) # Where to insert the new table
+                        table_insert_points[table_idx] = max(0, block_idx - len(blocks_to_remove) + offsetBlock) # Where to insert the new table
+                        offsetBlock += 1
                     blocks_to_remove.add(block_idx)
             table_coordinates.append({"page":page.pnum,"bbox": table_box})
 
