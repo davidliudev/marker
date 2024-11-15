@@ -93,7 +93,7 @@ def get_table_boxes(pages: List[Page], doc: PdfDocument, fname):
     return table_imgs, table_bboxes, table_counts, text_lines, out_img_sizes
 
 
-def format_tables(pages: List[Page], doc: PdfDocument, fname: str, detection_model, table_rec_model, ocr_model):
+def format_tables(pages: List[Page], doc: PdfDocument, fname: str, detection_model, table_rec_model, ocr_model,replace_tables: bool = False):
     det_models = [detection_model, detection_model.processor]
     rec_models = [table_rec_model, table_rec_model.processor, ocr_model, ocr_model.processor]
 
