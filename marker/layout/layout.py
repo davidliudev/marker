@@ -1,9 +1,11 @@
+from collections import defaultdict, Counter
 from typing import List
 
 from surya.layout import batch_layout_detection
 
 from marker.pdf.images import render_image
 from marker.schema.bbox import rescale_bbox
+from marker.schema.block import bbox_from_lines
 from marker.schema.page import Page
 from marker.settings import settings
 
@@ -16,8 +18,7 @@ def get_batch_size():
     return 6
 
 
-def surya_layout(doc, pages: List[Page], layout_model, batch_multiplier=1):
-    images = [render_image(doc[pnum], dpi=settings.SURYA_LAYOUT_DPI) for pnum in range(len(pages))]
+def surya_layout(images: list, pages: List[Page], layout_model, batch_multiplier=1):
     text_detection_results = [p.text_lines for p in pages]
 
     processor = layout_model.processor
@@ -41,8 +42,72 @@ def annotate_block_types(pages: List[Page]):
 
         for i, block in enumerate(page.blocks):
             block = page.blocks[i]
-            block_type = "Text"
-            if i in max_intersections:
+            block_type = None
+            if i in max_intersections and max_intersections[i][0] > 0.0:
                 j = max_intersections[i][1]
                 block_type = page.layout.bboxes[j].label
             block.block_type = block_type
+
+        # Smarter block layout assignment - first assign same as closest block
+        # Next, fall back to text
+        for i, block in enumerate(page.blocks):
+            if block.block_type is not None:
+                continue
+            min_dist = None
+            min_dist_idx = None
+            for j, block2 in enumerate(page.blocks):
+                if j == i or block2.block_type is None:
+                    continue
+                dist = block.distance(block2.bbox)
+                if min_dist_idx is None or dist < min_dist:
+                    min_dist = dist
+                    min_dist_idx = j
+                for line in block2.lines:
+                    dist = block.distance(line.bbox)
+                    if dist < min_dist:
+                        min_dist = dist
+                        min_dist_idx = j
+
+            if min_dist_idx is not None:
+                block.block_type = page.blocks[min_dist_idx].block_type
+
+        for i, block in enumerate(page.blocks):
+            if block.block_type is None:
+                block.block_type = settings.DEFAULT_BLOCK_TYPE
+
+        def get_layout_label(block_labels: List[str]):
+            counter = Counter(block_labels)
+            return counter.most_common(1)[0][0]
+
+        def generate_block(block, block_labels):
+            block.bbox = bbox_from_lines(block.lines)
+            block.block_type = get_layout_label(block_labels)
+            return block
+
+        # Merge blocks together, preserving pdf order
+        curr_layout_idx = None
+        curr_layout_block = None
+        curr_block_labels = []
+        new_blocks = []
+        for i in range(len(page.blocks)):
+            if i not in max_intersections or max_intersections[i][0] == 0:
+                if curr_layout_block is not None:
+                    new_blocks.append(generate_block(curr_layout_block, curr_block_labels))
+                curr_layout_block = None
+                curr_layout_idx = None
+                curr_block_labels = []
+                new_blocks.append(page.blocks[i])
+            elif max_intersections[i][1] != curr_layout_idx:
+                if curr_layout_block is not None:
+                    new_blocks.append(generate_block(curr_layout_block, curr_block_labels))
+                curr_layout_block = page.blocks[i].copy()
+                curr_layout_idx = max_intersections[i][1]
+                curr_block_labels = [page.blocks[i].block_type]
+            else:
+                curr_layout_block.lines.extend(page.blocks[i].lines)
+                curr_block_labels.append(page.blocks[i].block_type)
+
+        if curr_layout_block is not None:
+            new_blocks.append(generate_block(curr_layout_block, curr_block_labels))
+
+        page.blocks = new_blocks

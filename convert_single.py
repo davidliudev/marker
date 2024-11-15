@@ -3,6 +3,7 @@ import json
 
 import pypdfium2 # Needs to be at the top to avoid warnings
 import os
+
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1" # For some reason, transformers decided to use .isin for a simple op, which is not supported on MPS
 
 import argparse
@@ -36,7 +37,7 @@ def main():
     start = time.time()
     full_text, images, out_meta, table_md_list, table_coorinates = convert_single_pdf(
         fname, model_lst, max_pages=args.max_pages, langs=langs, batch_multiplier=args.batch_multiplier, start_page=args.start_page,
-        ocr_all_pages=args.ocr_all_pages, replace_tables=args.replace_tables)
+        replace_tables=args.replace_tables)
 
     fname = os.path.basename(fname)
     subfolder_path = save_markdown(args.output, fname, full_text, images, out_meta)
@@ -60,8 +61,7 @@ def main():
 
 
     print(f"Saved markdown to the {subfolder_path} folder")
-    if args.debug:
-        print(f"Total time: {time.time() - start}")
+    print(f"Total time: {time.time() - start}")
 
 
 if __name__ == "__main__":

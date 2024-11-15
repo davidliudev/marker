@@ -42,7 +42,7 @@ See [below](#benchmarks) for detailed speed and accuracy benchmarks, and instruc
 
 I want marker to be as widely accessible as possible, while still funding my development/training costs.  Research and personal usage is always okay, but there are some restrictions on commercial usage.
 
-The weights for the models are licensed `cc-by-nc-sa-4.0`, but I will waive that for any organization under $5M USD in gross revenue in the most recent 12-month period AND under $5M in lifetime VC/angel funding raised. If you want to remove the GPL license requirements (dual-license) and/or use the weights commercially over the revenue limit, check out the options [here](https://www.datalab.to).
+The weights for the models are licensed `cc-by-nc-sa-4.0`, but I will waive that for any organization under $5M USD in gross revenue in the most recent 12-month period AND under $5M in lifetime VC/angel funding raised. You also must not be competitive with the [Datalab API](https://www.datalab.to/).  If you want to remove the GPL license requirements (dual-license) and/or use the weights commercially over the revenue limit, check out the options [here](https://www.datalab.to).
 
 # Hosted API
 
@@ -50,7 +50,7 @@ There's a hosted API for marker available [here](https://www.datalab.to/):
 
 - Supports PDFs, word documents, and powerpoints 
 - 1/4th the price of leading cloud-based competitors
-- Leverages [Modal](https://modal.com/) for high reliability without latency spikes
+- High uptime (99.99%), quality, and speed (.25s/page for 50 page doc)
 
 # Community
 
@@ -89,6 +89,7 @@ First, some configuration:
 - Inspect the settings in `marker/settings.py`.  You can override any settings with environment variables.
 - Your torch device will be automatically detected, but you can override this.  For example, `TORCH_DEVICE=cuda`.
 - By default, marker will use `surya` for OCR.  Surya is slower on CPU, but more accurate than tesseract.  It also doesn't require you to specify the languages in the document.  If you want faster OCR, set `OCR_ENGINE` to `ocrmypdf`. This also requires external dependencies (see above).  If you don't want OCR at all, set `OCR_ENGINE` to `None`.
+- Some PDFs, even digital ones, have bad text in them.  Set `OCR_ALL_PAGES=true` to force OCR if you find bad output from marker.
 
 ## Interactive App
 
@@ -107,15 +108,15 @@ marker_single /path/to/file.pdf /path/to/output/folder --batch_multiplier 2 --ma
 
 - `--batch_multiplier` is how much to multiply default batch sizes by if you have extra VRAM.  Higher numbers will take more VRAM, but process faster.  Set to 2 by default.  The default batch sizes will take ~3GB of VRAM.
 - `--max_pages` is the maximum number of pages to process.  Omit this to convert the entire document.
+- `--start_page` is the page to start from (default is None, will start from the first page).
 - `--langs` is an optional comma separated list of the languages in the document, for OCR.  Optional by default, required if you use tesseract.
-- `--ocr_all_pages` is an optional argument to force OCR on all pages of the PDF.  If this or the env var `OCR_ALL_PAGES` are true, OCR will be forced.
 
 The list of supported languages for surya OCR is [here](https://github.com/VikParuchuri/surya/blob/master/surya/languages.py).  If you need more languages, you can use any language supported by [Tesseract](https://tesseract-ocr.github.io/tessdoc/Data-Files#data-files-for-version-400-november-29-2016) if you set `OCR_ENGINE` to `ocrmypdf`.  If you don't need OCR, marker can work with any language.
 
 ## Convert multiple files
 
 ```shell
-marker /path/to/input/folder /path/to/output/folder --workers 4 --max 10 --min_length 10000
+marker /path/to/input/folder /path/to/output/folder --workers 4 --max 10
 ```
 
 - `--workers` is the number of pdfs to convert at once.  This is set to 1 by default, but you can increase it to increase throughput, at the cost of more CPU/GPU usage.  Marker will use 5GB of VRAM per worker at the peak, and 3.5GB average.
@@ -136,7 +137,7 @@ You can use language names or codes.  The exact codes depend on the OCR engine. 
 ## Convert multiple files on multiple GPUs
 
 ```shell
-MIN_LENGTH=10000 METADATA_FILE=../pdf_meta.json NUM_DEVICES=4 NUM_WORKERS=15 marker_chunk_convert ../pdf_in ../md_out
+METADATA_FILE=../pdf_meta.json NUM_DEVICES=4 NUM_WORKERS=15 marker_chunk_convert ../pdf_in ../md_out
 ```
 
 - `METADATA_FILE` is an optional path to a json file with metadata about the pdfs.  See above for the format.
@@ -146,25 +147,105 @@ MIN_LENGTH=10000 METADATA_FILE=../pdf_meta.json NUM_DEVICES=4 NUM_WORKERS=15 mar
 
 Note that the env variables above are specific to this script, and cannot be set in `local.env`.
 
+
+## Use from python
+
+See the `convert_single_pdf` function for additional arguments that can be passed.
+
+```python
+from marker.convert import convert_single_pdf
+from marker.models import load_all_models
+
+fpath = "FILEPATH"
+model_lst = load_all_models()
+full_text, images, out_meta = convert_single_pdf(fpath, model_lst)
+```
+
+# Output format
+
+The output will be a markdown file, but there will also be a metadata json file that gives information about the conversion process.  It has these fields:
+
+```json
+{
+    "languages": null, // any languages that were passed in
+    "filetype": "pdf", // type of the file
+    "pdf_toc": [], // the table of contents from the pdf
+    "computed_toc": [], //the computed table of contents
+    "pages": 10, // page count
+    "ocr_stats": {
+        "ocr_pages": 0, // number of pages OCRed
+        "ocr_failed": 0, // number of pages where OCR failed
+        "ocr_success": 0,
+        "ocr_engine": "none"
+    },
+    "block_stats": {
+        "header_footer": 0,
+        "code": 0, // number of code blocks
+        "table": 2, // number of tables
+        "equations": {
+            "successful_ocr": 0,
+            "unsuccessful_ocr": 0,
+            "equations": 0
+        }
+    }
+}
+```
+
+## API server
+
+There is a very simple API server you can run like this:
+
+```shell
+pip install -U uvicorn fastapi python-multipart
+marker_server --port 8001
+```
+
+This will start a fastapi server that you can access at `localhost:8001`.  You can go to `localhost:8001/docs` to see the endpoint options.
+
+Note that this is not a very robust API, and is only intended for small-scale use.  If you want to use this server, but want a more robust conversion option, you can run against the hosted [Datalab API](https://www.datalab.to/plans).  You'll need to register and get an API key, then run:
+
+```shell
+marker_server --port 8001 --api_key API_KEY
+```
+
+Note: This is not the recommended way to use the Datalab API - it's only provided as a convenience for people wrapping the marker repo.  The recommended way is to make a post request to the endpoint directly from your code vs proxying through this server.
+
+You can send requests like this:
+
+```
+import requests
+import json
+
+post_data = {
+    'filepath': 'FILEPATH',
+    # Add other params here
+}
+
+requests.post("http://localhost:8001/marker", data=json.dumps(post_data)).json()
+```
+
 # Troubleshooting
 
 There are some settings that you may find useful if things aren't working the way you expect:
 
-- `OCR_ALL_PAGES` - set this to true to force OCR all pages.  This can be very useful if the table layouts aren't recognized properly by default, or if there is garbled text.
+- `OCR_ALL_PAGES` - set this to true to force OCR all pages.  This can be very useful if there is garbled text in the output of marker.
 - `TORCH_DEVICE` - set this to force marker to use a given torch device for inference.
 - `OCR_ENGINE` - can set this to `surya` or `ocrmypdf`.
-- `DEBUG` - setting this to `True` shows ray logs when converting multiple pdfs
 - Verify that you set the languages correctly, or passed in a metadata file.
 - If you're getting out of memory errors, decrease worker count (increased the `VRAM_PER_TASK` setting).  You can also try splitting up long PDFs into multiple files.
 
 In general, if output is not what you expect, trying to OCR the PDF is a good first step.  Not all PDFs have good text/bboxes embedded in them.
+
+## Debugging
+
+Set `DEBUG=true` to save data to the `debug` subfolder in the marker root directory.  This will save images of each page with detected layout and text, as well as output a json file with additional bounding box information.
 
 ## Useful settings
 
 These settings can improve/change output quality:
 
 - `OCR_ALL_PAGES` will force OCR across the document.  Many PDFs have bad text embedded due to older OCR engines being used.
-- `PAGINATE_OUTPUT` will put a horizontal rule between pages.  Default: False.
+- `PAGINATE_OUTPUT` will put a horizontal rule between pages.  Default: False.  The horizontal rule will be `\n\n`, then `{PAGE_NUMBER}`, then 48 single dashes `-`, then `\n\n`.  The separator can be configured via the `PAGE_SEPARATOR` setting.
 - `EXTRACT_IMAGES` will extract images and save separately.  Default: True.
 - `BAD_SPAN_TYPES` specifies layout blocks to remove from the markdown output.
 
@@ -210,20 +291,12 @@ poetry install
 Download the benchmark data [here](https://drive.google.com/file/d/1ZSeWDo2g1y0BRLT7KnbmytV2bjWARWba/view?usp=sharing) and unzip. Then run the overall benchmark like this:
 
 ```shell
-python benchmark/overall.py data/pdfs data/references report.json --nougat
+python benchmarks/overall.py data/pdfs data/references report.json --nougat
 ```
 
 This will benchmark marker against other text extraction methods.  It sets up batch sizes for nougat and marker to use a similar amount of GPU RAM for each.
 
 Omit `--nougat` to exclude nougat from the benchmark.  I don't recommend running nougat on CPU, since it is very slow.
-
-### Table benchmark
-
-There is a benchmark for table parsing, which you can run with:
-
-```shell
-python benchmarks/table.py test_data/tables.json
-```
 
 # Thanks
 
@@ -233,6 +306,5 @@ This work would not have been possible without amazing open source models and da
 - Texify
 - Pypdfium2/pdfium
 - DocLayNet from IBM
-- ByT5 from Google
 
 Thank you to the authors of these models and datasets for making them available to the community!
