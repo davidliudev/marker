@@ -109,6 +109,7 @@ def format_tables(pages: List[Page], doc: PdfDocument, fname: str, detection_mod
     table_md = [formatter("markdown", cell)[0] for cell in cells]
 
     table_count = 0
+    current_table_idx = 0
     table_markdown_list = []
     table_coordinates=[]
     for page_idx, page in enumerate(pages):
@@ -148,7 +149,7 @@ def format_tables(pages: List[Page], doc: PdfDocument, fname: str, detection_mod
                 continue
 
             markdown = table_md[table_count]
-            table_title = f"<<<Table {table_count}>>>\n"
+            table_title = f"<<<Table {current_table_idx}>>>\n"
             table_block = Block(
                 bbox=table_box,
                 block_type="Text" if replace_tables else "Table",
@@ -172,6 +173,7 @@ def format_tables(pages: List[Page], doc: PdfDocument, fname: str, detection_mod
             new_page_blocks.insert(insert_point, table_block)
             page_tables.append({"insert_point": insert_point,"table_text": markdown})
             table_count += 1
+            current_table_idx += 1
 
         # Sort the tables by insert point key
         page_tables = sorted(page_tables, key=lambda x: x['insert_point'])
